@@ -80,6 +80,11 @@ Disposing the load order disposes its plugin overlays.
 
 Use a mutable link cache when adding or removing records from an output mod included in the cache.
 
+### Location reference lists
+
+`LocationExt.All*` can omit references added by the provider you pass in and retain references removed by later overrides.
+It skips `highestOverrideModKey` and processes preceding definitions newest-first.
+
 ## Create records and overrides
 
 Polymorphic groups require a concrete record variant.

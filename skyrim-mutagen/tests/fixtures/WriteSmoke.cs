@@ -84,5 +84,18 @@ if (winner.EditorID != "WriteSmokeNpcPatched"
     return 1;
 }
 
+var previous = linkCache.GetPreviousOverrides<INpcGetter>(formKey, patchKey).ToArray();
+var previousContexts = linkCache.GetPreviousOverrideSimpleContexts<INpcGetter>(
+    formKey, patchKey, ResolveTarget.Origin).ToArray();
+if (previous.Length != 1
+    || previous[0].EditorID != "WriteSmokeNpc"
+    || previousContexts.Length != 1
+    || previousContexts[0].ModKey != sourceKey
+    || linkCache.GetPreviousOverrides<INpcGetter>(formKey, sourceKey).Any())
+{
+    Console.Error.WriteLine("previous-override boundary mismatch");
+    return 1;
+}
+
 Console.WriteLine("write smoke passed");
 return 0;

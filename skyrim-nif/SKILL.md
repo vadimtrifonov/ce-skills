@@ -42,7 +42,8 @@ Inspect both `_0.nif` and `_1.nif` members of a weight-slider pair when relevant
 
 ## Archive-native lookup
 
-FO76Utils can locate NIFs in loose files and BSA/BA2 archives beneath a physical Data-like directory:
+FO76Utils can locate NIFs in loose files and BSA/BA2 archives beneath a physical Data-like directory.
+For direct PowerShell calls, set `$env:TERM = 'dumb'` so FO76Utils does not bypass redirected stdout and stderr.
 
 ```bash
 mise exec -- nif_info.exe -q "<Data-directory>" "meshes/path/model.nif"

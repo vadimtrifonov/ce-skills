@@ -11,7 +11,7 @@ It can use SKSE interfaces and call or modify Skyrim's engine code.
 | Component | Role |
 |---|---|
 | [SKSEVR](https://skse.silverlock.org/) | The VR edition of Skyrim Script Extender. Its loader starts the game with SKSEVR; the runtime loads plugin DLLs and provides interfaces such as messaging and task scheduling. |
-| [CommonLibSSE-NG](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.0.0/README.md) | A C++ library compiled into the plugin, providing reverse-engineered engine types, function wrappers, and runtime-specific address and layout helpers. |
+| [CommonLibSSE-NG](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.5.4/README.md) | A C++ library compiled into the plugin, providing reverse-engineered engine types, function wrappers, and runtime-specific address and layout helpers. |
 | [VR Address Library](https://github.com/alandtse/skyrim_vr_address_library#release-csvs) | Runtime data mapping IDs to offsets inside `SkyrimVR.exe`, used by CommonLib to resolve engine addresses. |
 | [VR Address Tools](https://github.com/alandtse/vr_address_tools#description) | Development-time tools for scanning relocation uses in source and generating address-library CSVs. |
 
@@ -23,14 +23,17 @@ The SE/AE Address Library packages do not supply that file.
 The VR loader requires `SKSEPlugin_Query` and `SKSEPlugin_Load`; AE's `SKSEPlugin_Version` metadata alone is insufficient.
 Keep `Query` to compatibility checks and plugin information.
 Initialize CommonLib with `SKSE::Init` in `Load`, before installing hooks or using SKSE interfaces.
+Optional initialization settings use [`SKSE::InitInfo`](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.5.4/include/SKSE/API.h); the boolean `Init` overload and `AllocTrampoline` are deprecated.
+Request a trampoline through `InitInfo` with `trampoline = true` and `trampolineSize` set to the required byte count.
+The `PreLoadInterface` overload is AE-only, not a replacement for VR's `Load` initialization.
 See the [SKSEVR plugin API](https://github.com/SkyrimAlternativeDevelopers/sksevr-mirror/blob/76e8afaf2253851ca22a209e456620430df16fc2/skse64/PluginAPI.h#L303-L351) for the export contract.
 
 A hook that intercepts record loading must be installed before records load; `DataLoaded` is too late.
 Work that consumes populated form data can wait for `DataLoaded`.
 When replacing an existing plugin, preserve any DLL filename and exported ABI used by consumers; the SKSE metadata name is a separate identity.
 
-The CommonLib references in this skill use `v7.0.0`.
-For build integration and runtime selection, see [CommonLib usage](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.0.0/README.md#usage) and [Runtime Targeting](https://github.com/CharmedBaryon/CommonLibSSE-NG/wiki/Runtime-Targeting).
+The CommonLib references in this skill use `v7.5.4`.
+For build integration and runtime selection, see [CommonLib usage](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.5.4/README.md#usage) and [Runtime Targeting](https://github.com/CharmedBaryon/CommonLibSSE-NG/wiki/Runtime-Targeting).
 
 ## Addresses and relocations
 
@@ -52,12 +55,12 @@ A `VariantOffset` passed as the sole argument to `REL::Relocation<T>` is relativ
 Passed after an ID, it is relative to that ID's resolved address.
 This expresses a containing function plus a separately verified interior offset.
 The two-argument `REL::Relocate(seAndVR, ae)` also groups VR with SE; use three arguments when VR needs a distinct value.
-See [ID constructors](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.0.0/include/REL/ID.h) for the ID/RVA distinction.
+See [ID constructors](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.5.4/include/REL/ID.h) for the ID/RVA distinction.
 
-Missing-ID lookup is not an availability probe: [CommonLib's lookup](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.0.0/src/REL/IDDB.cpp#L156-L180) takes a fatal error path in production.
+Missing-ID lookup is not an availability probe: [CommonLib's lookup](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.5.4/src/REL/IDDB.cpp#L156-L180) takes a fatal error path in production.
 A subsequent null check or `try/catch` does not provide a fallback.
 Check the mapping data before resolving an uncertain ID.
-Likewise, [v7's `Offset2ID`](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.0.0/src/REL/Offset2ID.cpp#L37-L56) requires an exact offset match; it does not find the function containing an arbitrary instruction.
+Likewise, [`Offset2ID`](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.5.4/src/REL/Offset2ID.cpp#L37-L56) requires an exact offset match; it does not find the function containing an arbitrary instruction.
 
 ## ABI and object layout
 
@@ -73,7 +76,12 @@ On x64, divide the vtable byte displacement by 8: `[vtable + 0x190]` uses slot 5
 
 Cross-VR builds can replace real inheritance with `As...` accessors and virtual dispatch with `REL::RelocateVirtual` wrappers.
 Use the class's runtime accessors instead of assuming a direct member or `static_cast` has the same layout on VR.
-For conditional inheritance and pointer-versus-reference access, see [Runtime Cast Accessors](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.0.0/docs/RuntimeDataAccessors.md#runtime-cast-accessors) and [Pointer Member Accessors](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.0.0/docs/RuntimeDataAccessors.md#pointer-member-accessors).
+For conditional inheritance and pointer-versus-reference access, see [Runtime Cast Accessors](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.5.4/docs/RuntimeDataAccessors.md#runtime-cast-accessors) and [Pointer Member Accessors](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.5.4/docs/RuntimeDataAccessors.md#pointer-member-accessors).
+AE-enabled builds use `BSGraphics::State::GetFrameCount()` and `GetUseEarlyZ()` instead of direct access to those fields.
+In CommonLib 7.5.4, `GetInsideFrame()` accesses `compiledShaderThisFrame` at `0x54` on VR, not `insideFrame` at `0x50`.
+
+For plugin-owned menu input handlers, [`RE::MenuEventHandlerEx`](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.5.4/include/RE/M/MenuEventHandlerEx.h) provides runtime-specific dispatch.
+Pass its `Handler()` result, not the adapter's `this` pointer, to `MenuControls::RegisterHandler` and `RemoveHandler`.
 
 ## Query mappings and audit source
 
@@ -102,11 +110,13 @@ See the [CSV format documentation](https://github.com/alandtse/skyrim_vr_address
 Only status `4` asserts byte identity; a weaker function match does not justify carrying an interior offset unchanged.
 Even status `4` does not describe changes made by other loaded plugins.
 
-To scan source, use the [VR Address Tools environment setup](https://github.com/alandtse/vr_address_tools#setting-up), then run from its checkout:
+To scan source, run from this skill directory:
 
 ```powershell
-Set-Location $tools
-poetry run python .\vr_address_tools.py 'C:\Path\To\Plugin\src' analyze
+mise trust mise.toml
+mise install
+mise exec -- python -m pip install --upgrade --editable "$tools"
+mise exec -- python -m vr_address_tools 'C:\Path\To\Plugin\src' analyze
 ```
 
 `analyze` reports recognized relocation uses and candidate mappings.
@@ -141,7 +151,7 @@ auto handler = command ? command->executeFunction : nullptr;
 ```
 
 This obtains the live execute handler, not an interior patch offset.
-The command table itself is relocated by CommonLib; see [CommandTable.cpp](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.0.0/src/RE/C/CommandTable.cpp).
+The command table itself is relocated by CommonLib; see [CommandTable.cpp](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.5.4/src/RE/C/CommandTable.cpp).
 Disassemble the handler to locate the required operation.
 
 For accepted console input, the active `RE::Console` menu's `fxDelegate->callbacks.GetAlt("ExecuteCommand")` exposes the registered Scaleform callback.
@@ -203,7 +213,7 @@ Verification helpers read memory directly; establish that a derived window is re
 The raw expected-byte overload rejects verification longer than the overwrite.
 The pattern overload starts at the write address and can verify bytes beyond the overwrite.
 Check a preceding prefix with `verify_code` at the prefix's address before writing.
-See the [write implementation](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.0.0/src/REL/Relocation.cpp) and [verification overloads](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.0.0/include/REL/Relocation.h) for the exact behavior in this version.
+See the [write implementation](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.5.4/src/REL/Relocation.cpp) and [verification overloads](https://github.com/alandtse/CommonLibSSE-NG/blob/v7.5.4/include/REL/Relocation.h) for the exact behavior in this version.
 
 ## Verify execution and behavior
 

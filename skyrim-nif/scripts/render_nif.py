@@ -100,6 +100,8 @@ def run_tool(command: list[str], timeout: float) -> subprocess.CompletedProcess[
             errors="replace",
             timeout=timeout,
             check=False,
+            # FO76Utils otherwise reopens stdout/stderr as CONOUT$ on Windows.
+            env=os.environ | {"TERM": os.environ.get("TERM", "dumb")},
         )
     except subprocess.TimeoutExpired as error:
         raise RenderError(f"nif_info timed out after {timeout:g} seconds") from error
