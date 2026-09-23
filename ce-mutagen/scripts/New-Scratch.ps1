@@ -1,6 +1,10 @@
 [CmdletBinding()]
 param(
-    [Parameter(Position = 0)]
+    [Parameter(Mandatory, Position = 0)]
+    [ValidateSet('Skyrim', 'Starfield')]
+    [string] $Game,
+
+    [Parameter(Position = 1)]
     [string] $TaskName = 'scratch'
 )
 
@@ -12,7 +16,8 @@ try {
         throw 'MUTAGEN_ROOT is unset; run this command through mise'
     }
 
-    $mutagenProject = Join-Path $env:MUTAGEN_ROOT 'Mutagen.Bethesda.Skyrim/Mutagen.Bethesda.Skyrim.csproj'
+    $Game = if ($Game -eq 'Skyrim') { 'Skyrim' } else { 'Starfield' }
+    $mutagenProject = Join-Path $env:MUTAGEN_ROOT "Mutagen.Bethesda.$Game/Mutagen.Bethesda.$Game.csproj"
     if (-not (Test-Path -LiteralPath $mutagenProject -PathType Leaf)) {
         throw "Mutagen is not set up; run 'mise run setup' in the skill directory"
     }
@@ -26,18 +31,17 @@ try {
     }
 
     $suffix = [Guid]::NewGuid().ToString('N').Substring(0, 12)
-    $destination = Join-Path ([IO.Path]::GetTempPath()) "skyrim-mutagen-$slug-$suffix"
+    $destination = Join-Path ([IO.Path]::GetTempPath()) "ce-mutagen-$slug-$suffix"
     [IO.Directory]::CreateDirectory($destination) | Out-Null
 
     $templateRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'templates'
     try {
-        foreach ($name in 'Scratch.csproj', 'Program.cs') {
-            $source = Join-Path $templateRoot $name
-            if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
-                throw "Template does not exist: $source"
-            }
-            Copy-Item -LiteralPath $source -Destination (Join-Path $destination $name)
-        }
+        $project = [IO.File]::ReadAllText((Join-Path $templateRoot 'Scratch.csproj'))
+        [IO.File]::WriteAllText(
+            (Join-Path $destination 'Scratch.csproj'),
+            $project.Replace('__GAME__', $Game))
+        Copy-Item -LiteralPath (Join-Path $templateRoot "Program.$Game.cs") `
+            -Destination (Join-Path $destination 'Program.cs')
     }
     catch {
         Remove-Item -LiteralPath $destination -Recurse -Force -ErrorAction SilentlyContinue

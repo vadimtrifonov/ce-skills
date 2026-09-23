@@ -1,4 +1,6 @@
-# Common Mutagen Patterns
+# Skyrim Patterns
+
+Examples use `SkyrimRelease.SkyrimVR`; use `SkyrimRelease.SkyrimSE` for Special Edition.
 
 ## Read a plugin
 
@@ -28,8 +30,8 @@ using var mod = SkyrimMod.Create(SkyrimRelease.SkyrimVR)
     .Construct();
 ```
 
-`WithStringsFolder` overrides the loose strings directory but does not disable BSA lookup.
-`WithBsaFolder` overrides the directory searched for applicable BSAs.
+`WithStringsFolder` overrides the loose strings directory but does not disable archive lookup.
+`WithBsaFolder` overrides the directory searched for applicable archives.
 
 For an MO2 profile, resolve the plugin, loose string files, and applicable archives according to profile priority; they can have different providers.
 
@@ -62,7 +64,7 @@ using Mutagen.Bethesda.Plugins.Order;
 using Mutagen.Bethesda.Skyrim;
 
 var listings = orderedProviders
-    .Select(provider => SkyrimMod.Create(release).FromPath(provider).Construct())
+    .Select(provider => SkyrimMod.Create(SkyrimRelease.SkyrimVR).FromPath(provider).Construct())
     .Select(mod => new ModListing<ISkyrimModGetter>(mod))
     .ToArray();
 
@@ -134,7 +136,7 @@ Checks against the in-memory output do not exercise binary serialization.
 Reopen the written plugin before checking it:
 
 ```csharp
-using var written = SkyrimMod.Create(release)
+using var written = SkyrimMod.Create(SkyrimRelease.SkyrimVR)
     .FromPath(outputPath)
     .Construct();
 ```
@@ -149,3 +151,11 @@ Generated traversal can be incomplete for nested records.
 Do not use `Equals`, `GetEqualsMask`, or a `TranslationMask` as a generic compatibility test.
 Compare the required fields directly.
 If generated equality is required, inspect its implementation for the exact record type.
+
+## Record source
+
+Under `tools/Mutagen/Mutagen.Bethesda.Skyrim`:
+
+- GLOB variants: `Records/Major Records/GlobalShort_Generated.cs` and `GlobalFloat_Generated.cs`.
+- VMAD: `Interfaces/Aspect/IHaveVirtualMachineAdapter.cs`, `Records/Common Subrecords/AVirtualMachineAdapter.cs`, and `ScriptEntry_Generated.cs`.
+- Nested records: `Records/Major Records/Cell_Generated.cs`, `Worldspace_Generated.cs`, and `Extensions/*ContextExt.cs`.

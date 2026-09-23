@@ -8,6 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(MUTAGEN_ROOT)/Mutagen.Bethesda.Skyrim/Mutagen.Bethesda.Skyrim.csproj" />
+    <ProjectReference Include="$(MUTAGEN_ROOT)/Mutagen.Bethesda.__GAME__/Mutagen.Bethesda.__GAME__.csproj" />
   </ItemGroup>
 </Project>
