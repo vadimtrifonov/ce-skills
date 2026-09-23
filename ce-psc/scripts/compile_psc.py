@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile one Skyrim Papyrus PSC with Caprica."""
+"""Compile one Papyrus PSC with Caprica for Skyrim or Bethesda's compiler for Starfield."""
 
 from __future__ import annotations
 
@@ -15,17 +15,18 @@ from pathlib import Path
 from typing import NoReturn
 
 LEADING_ZERO_INTEGER = re.compile(r"(?<![A-Za-z0-9_.])0[0-9]+(?![A-Za-z0-9_.])")
-SCRIPT_DECLARATION = re.compile(r"(?im)^\s*scriptname\s+([A-Za-z_][A-Za-z0-9_]*)\b")
+QUALIFIED_NAME = r"[A-Za-z_][A-Za-z0-9_]*(?::[A-Za-z_][A-Za-z0-9_]*)*"
+SCRIPT_DECLARATION = re.compile(rf"(?im)^\s*scriptname\s+({QUALIFIED_NAME})\b")
 STATE_DECLARATION = re.compile(r"(?i)^\s*(?:auto\s+)?state\s+([A-Za-z_][A-Za-z0-9_]*)\b")
 END_STATE = re.compile(r"(?i)^\s*endstate\b")
 PROPERTY_DECLARATION = re.compile(
-    r"(?i)^\s*[A-Za-z_][A-Za-z0-9_]*(?:\s*\[\s*\])?\s+"
+    rf"(?i)^\s*{QUALIFIED_NAME}(?:\s*\[\s*\])?\s+"
     r"property\s+[A-Za-z_][A-Za-z0-9_]*\b(?P<tail>.*)$"
 )
 END_PROPERTY = re.compile(r"(?i)^\s*endproperty\b")
 AUTO_PROPERTY = re.compile(r"(?i)\bauto(?:readonly)?\b")
 CALLABLE_DECLARATION = re.compile(
-    r"(?i)^\s*(?:(?:[A-Za-z_][A-Za-z0-9_]*)(?:\s*\[\s*\])?\s+)?"
+    rf"(?i)^\s*(?:{QUALIFIED_NAME}(?:\s*\[\s*\])?\s+)?"
     r"(function|event)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\("
 )
 
@@ -57,10 +58,6 @@ def installed_source_directory(variable: str, relative: str) -> Path:
     if not raw_root:
         fail(f"{variable} is unset. Run the script through 'mise exec --'.")
     return directory_path(Path(raw_root) / Path(relative), f"{variable} source directory")
-
-
-def vanilla_source_directory() -> Path:
-    return installed_source_directory("TESV_SCRIPTS_ROOT", "Base")
 
 
 def mask_strings_and_comments(text: str) -> str:
@@ -143,12 +140,12 @@ def line_and_column(text: str, offset: int) -> tuple[int, int]:
     return line, column
 
 
-def preflight(source: Path) -> str:
+def preflight(source: Path, game: str) -> str:
     data = source.read_bytes()
     errors: list[str] = []
 
     has_bom = data.startswith(b"\xef\xbb\xbf")
-    if has_bom:
+    if has_bom and game == "skyrim":
         errors.append("1:1: save the source as UTF-8 without BOM")
 
     try:
@@ -159,12 +156,13 @@ def preflight(source: Path) -> str:
 
     masked = mask_strings_and_comments(text)
 
-    for match in LEADING_ZERO_INTEGER.finditer(masked):
-        line, column = line_and_column(masked, match.start())
-        errors.append(
-            f"{line}:{column}: replace leading-zero integer '{match.group(0)}'; "
-            "Caprica parses it as octal"
-        )
+    if game == "skyrim":
+        for match in LEADING_ZERO_INTEGER.finditer(masked):
+            line, column = line_and_column(masked, match.start())
+            errors.append(
+                f"{line}:{column}: replace leading-zero integer '{match.group(0)}'; "
+                "Caprica parses it as octal"
+            )
 
     script_names = SCRIPT_DECLARATION.findall(masked)
     if len(script_names) != 1:
@@ -172,6 +170,10 @@ def preflight(source: Path) -> str:
         script_name = source.stem
     else:
         script_name = script_names[0]
+        parts = script_name.split(":")
+        actual = source.with_suffix("").parts[-len(parts):]
+        if tuple(part.casefold() for part in actual) != tuple(part.casefold() for part in parts):
+            errors.append(f"Scriptname '{script_name}' requires a source path ending in {'/'.join(parts)}.psc")
 
     state = ""
     in_full_property = False
@@ -220,6 +222,8 @@ def preflight(source: Path) -> str:
 
 
 def output_file(directory: Path, script_name: str) -> Path:
+    *namespace, script_name = script_name.split(":")
+    directory = directory.joinpath(*namespace)
     expected = directory / f"{script_name}.pex"
     if expected.exists():
         return expected
@@ -231,6 +235,7 @@ def output_file(directory: Path, script_name: str) -> Path:
 
 def install_output(source: Path, destination: Path) -> None:
     try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(
             prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent
         )
@@ -251,6 +256,7 @@ def install_output(source: Path, destination: Path) -> None:
 def arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path, help="PSC source file")
+    parser.add_argument("--game", choices=("skyrim", "starfield"), required=True, help="PEX target game")
     parser.add_argument("-o", "--output", type=Path, required=True, help="PEX output directory")
     parser.add_argument(
         "-i",
@@ -272,13 +278,23 @@ def main() -> int:
         if source.suffix.casefold() != ".psc":
             fail(f"source must have a .psc extension: {source}")
 
-        script_name = preflight(source)
-        vanilla_sources = vanilla_source_directory()
-        default_flags = vanilla_sources / "TESV_Papyrus_Flags.flg"
-        flags = file_path(args.flags, "flags file") if args.flags else file_path(default_flags, "default flags file")
+        script_name = preflight(source, args.game)
+        if args.game == "skyrim":
+            vanilla_sources = installed_source_directory("TESV_SCRIPTS_ROOT", "Base")
+            flags_name = "TESV_Papyrus_Flags.flg"
+            caprica = shutil.which("Caprica.exe")
+            if not caprica:
+                fail("Caprica.exe is unavailable. Run the script through 'mise exec --'.")
+            compiler = Path(caprica)
+        else:
+            vanilla_sources = installed_source_directory("STARFIELD_SCRIPTS_ROOT", "Source")
+            flags_name = "Starfield_Papyrus_Flags.flg"
+            compiler = file_path(
+                vanilla_sources.parent / "bin/PapyrusCompiler/PapyrusCompiler.exe", "Starfield compiler"
+            )
+        flags = file_path(args.flags or vanilla_sources / flags_name, "flags file")
 
-        source_directory = source.parent.resolve()
-        vanilla_sources = vanilla_sources.resolve()
+        source_directory = source.parents[len(script_name.split(":")) - 1]
         vanilla_key = os.path.normcase(str(vanilla_sources))
 
         ordered_imports = [source_directory]
@@ -301,39 +317,36 @@ def main() -> int:
         if pex.exists() and not args.force:
             fail(f"output already exists; pass --force to replace it: {pex}")
 
-        caprica = shutil.which("Caprica.exe")
-        if not caprica:
-            fail("Caprica.exe is unavailable. Run the script through 'mise exec --'.")
-
         print(f"Vanilla dependency set: {vanilla_sources}")
         print("Import order:")
         for import_directory in ordered_imports:
             print(f"  {import_directory}")
 
-        with tempfile.TemporaryDirectory(prefix="skyrim-psc-") as temporary_directory:
+        with tempfile.TemporaryDirectory(prefix="ce-psc-") as temporary_directory:
             build_directory = Path(temporary_directory)
-            command = [
-                caprica,
-                "--game",
-                "skyrim",
-                "--ignorecwd",
-                "--flags",
-                str(flags),
-                "--output",
-                str(build_directory),
-            ]
-            for import_directory in ordered_imports:
-                command.extend(("--import", str(import_directory)))
-            command.append(str(source))
+            if args.game == "skyrim":
+                command = [
+                    str(compiler), "--game", "skyrim", "--ignorecwd",
+                    "--flags", str(flags), "--output", str(build_directory),
+                ]
+                for import_directory in ordered_imports:
+                    command.extend(("--import", str(import_directory)))
+                command.append(str(source))
+            else:
+                command = [
+                    str(compiler), script_name, "-ignorecwd",
+                    f"-i={';'.join(str(path) for path in ordered_imports)}",
+                    f"-f={flags}", f"-o={build_directory}",
+                ]
 
             print(f"Running: {subprocess.list2cmdline(command)}", flush=True)
             result = subprocess.run(command)
 
             built_pex = output_file(build_directory, script_name)
             if result.returncode != 0:
-                fail(f"Caprica failed with exit code {result.returncode}")
+                fail(f"{compiler.name} failed with exit code {result.returncode}")
             if not built_pex.is_file() or built_pex.stat().st_size == 0:
-                fail(f"Caprica returned success without a non-empty PEX: {built_pex}")
+                fail(f"{compiler.name} returned success without a non-empty PEX: {built_pex}")
 
             size = built_pex.stat().st_size
             digest = hashlib.sha256(built_pex.read_bytes()).hexdigest()

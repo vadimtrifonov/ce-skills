@@ -2,6 +2,8 @@
 python = "3.14"
 "http:caprica" = { version = "0.3.0a", url = "https://github.com/KrisV-777/Caprica/releases/download/0.3.0a/Caprica.zip", checksum = "sha256:8bb87175ecf685fb40b07b8805415062157714109bab0925bc0bb0933e4f549c", bin_path = "." }
 "http:tesv-scripts" = { version = "e57131ba4bf3e50f1ade84a93b3b7fe79834720d", url = "https://github.com/digital-apple/TESVScripts/archive/e57131ba4bf3e50f1ade84a93b3b7fe79834720d.zip", checksum = "sha256:1d1e1a222f8476c985b11e2ab8771dd87b469aac4335aedf5b2a64534219d659" }
+"http:starfield-scripts" = { version = "5b12059b81caa0cb543b002f2ca30ce04852e7ea", url = "https://github.com/rux616/modding-sf1-scripts-vanilla/archive/5b12059b81caa0cb543b002f2ca30ce04852e7ea.zip", checksum = "sha256:21d31e919e38545d732101a8eaf9adf7351adb201d167bce4e4df0116e3aba06" }
 
 [env]
 TESV_SCRIPTS_ROOT = { value = "{{ tools['http:tesv-scripts'].path }}", tools = true }
+STARFIELD_SCRIPTS_ROOT = { value = "{{ tools['http:starfield-scripts'].path }}", tools = true }

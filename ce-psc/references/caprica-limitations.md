@@ -1,13 +1,13 @@
 # Caprica Limitations
 
-The skill uses [KrisV-777/Caprica 0.3.0a](https://github.com/KrisV-777/Caprica/releases/tag/0.3.0a) in Skyrim mode without Caprica language extensions or forced optimization.
+The helper uses [KrisV-777/Caprica 0.3.0a](https://github.com/KrisV-777/Caprica/releases/tag/0.3.0a) in Skyrim mode without Caprica language extensions or forced optimization.
 
 ## Preflight rules
 
 ### Source encoding
 
-Caprica rejects a PSC that starts with a UTF-8 byte-order mark.
-The compile helper requires UTF-8 without a byte-order mark.
+Caprica rejects a PSC that starts with a UTF-8 byte-order mark (BOM).
+The compile helper therefore requires UTF-8 without a BOM.
 
 Upstream issue: [Orvid/Caprica#37](https://github.com/Orvid/Caprica/issues/37)
 
@@ -22,7 +22,7 @@ The error changes generated program data without a compiler failure.
 ```
 
 The compile helper rejects all leading-zero decimal integer tokens outside comments and strings.
-Hexadecimal literals such as `0x0008` are not affected.
+Hexadecimal literals such as `0x0008` remain valid.
 
 Upstream issue: [Orvid/Caprica#31](https://github.com/Orvid/Caprica/issues/31)
 
@@ -59,7 +59,7 @@ Caprica documents differences from Bethesda's compiler for these language cases:
 - Implicit conversion from `None` to `Bool`, `String`, arrays, and objects.
 - Access to auto-property backing variables declared by parent scripts.
 
-The details are in the Caprica [Deliberate Differences](https://github.com/KrisV-777/Caprica/blob/0.3.0a/README.md#deliberate-differences-from-the-papyrus-compiler-in-the-creation-kit) section.
+The details are in the Caprica [Deliberate Differences](https://github.com/KrisV-777/Caprica/blob/0.3.0a/README.md) section.
 These cases can cause a compiler error or different property-access code.
 
 ## Output behavior
@@ -69,4 +69,4 @@ These cases can cause a compiler error or different property-access code.
 Caprica writes the source path, user name, computer name, and compilation time into the PEX header.
 Builds made at different times or from different source paths have different file hashes.
 The `--anonymize` option has no effect.
-These fields remain populated.
+The identifying values remain in the PEX.
