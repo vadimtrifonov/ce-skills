@@ -9,16 +9,20 @@ from typing import Any
 from spriggit_tree import RecordObject, SpriggitTree, SpriggitTreeError
 
 
-# Skyrim group names that do not map to record types by regular singularization.
+# Group names that do not map to record types by regular singularization.
 ROOT_TYPE_OVERRIDES = {
     "Actions": "ActionRecord",
     "AlchemicalApparatuses": "AlchemicalApparatus",
     "BodyParts": "BodyPartData",
+    "Clouds": "Clouds",
     "Colors": "ColorRecord",
     "Debris": "Debris",
     "Eyes": "Eyes",
     "Florae": "Flora",
+    "InstanceNamingRules": "InstanceNamingRules",
+    "ObjectModifications": "AObjectModification",
     "ReverbParameters": "ReverbParameters",
+    "TimeOfDays": "TimeOfDayRecord",
     "WordsOfPower": "WordOfPower",
 }
 
@@ -39,6 +43,8 @@ def singularize(category: str) -> str:
 
 def root_record_type(relative_parts: tuple[str, ...]) -> str:
     category = relative_parts[0]
+    if category == "Quests" and len(relative_parts) > 3:
+        category = relative_parts[2]
     if category == "DialogTopics" and relative_parts[-2] == "Responses":
         return "DialogResponses"
     if category == "Worldspaces" and len(relative_parts) > 3:
@@ -69,13 +75,14 @@ def record_type(record: dict[str, Any], relative_parts: tuple[str, ...], pointer
 
 
 def is_deleted(record: dict[str, Any]) -> bool:
-    flags = record.get("SkyrimMajorRecordFlags", [])
-    if isinstance(flags, str):
-        flags = [flags]
-    if isinstance(flags, list) and any(
-        isinstance(flag, str) and flag.casefold() == "deleted" for flag in flags
-    ):
-        return True
+    for field in ("SkyrimMajorRecordFlags", "StarfieldMajorRecordFlags"):
+        flags = record.get(field, [])
+        if isinstance(flags, str):
+            flags = [flags]
+        if isinstance(flags, list) and any(
+            isinstance(flag, str) and flag.casefold() == "deleted" for flag in flags
+        ):
+            return True
 
     raw = record.get("MajorRecordFlagsRaw")
     try:

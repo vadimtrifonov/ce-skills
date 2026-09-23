@@ -1,9 +1,9 @@
 ---
-name: skyrim-spriggit
-description: Serialize or rebuild Skyrim plugins with Spriggit. Use to list major records, retrieve complete records by FormKey, or compare override definitions that share a FormKey.
+name: ce-spriggit
+description: Serialize or rebuild Skyrim and Starfield plugins with Spriggit. Use to list major records, retrieve complete records by FormKey, or compare override definitions that share a FormKey.
 ---
 
-# Skyrim Spriggit
+# Spriggit
 
 Use this skill directory as the working directory.
 
@@ -20,11 +20,18 @@ Use a clean, dedicated output directory.
 Use `<ModName>.spriggit` as the directory name.
 
 ```bash
-mise exec -- Spriggit.CLI.exe serialize --InputPath "<plugin.esp>" --OutputPath "<ModName>.spriggit" --GameRelease <SkyrimSE|SkyrimVR> --PackageName Spriggit.Json --PackageVersion <version>
+mise exec -- Spriggit.CLI.exe serialize --InputPath "<plugin>" --OutputPath "<ModName>.spriggit" --GameRelease <SkyrimSE|SkyrimVR|Starfield> --PackageName Spriggit.Json --PackageVersion <version>
 ```
 
+For Starfield, add `--DataFolder "<data-directory>"` containing the masters and their dependencies.
+Alternatively, specify their `Full`, `Medium`, or `Small` styles in a [`.spriggit` configuration](https://mutagen-modding.github.io/Spriggit/spriggit-file/#known-masters).
+Place that file above the output directory, not inside it.
+
+Starfield reflection data such as `ATMO.REFL` remains opaque hex.
+Changing the master list does not automatically remap FormIDs inside those bytes.
+
 Spriggit stores translation-package executables under `%TEMP%\Spriggit`.
-An incomplete cache can cause a missing `Spriggit.Json.Skyrim.exe` error.
+An incomplete cache can cause a missing `Spriggit.Json.<Game>.exe` error.
 If the missing executable path is under `%TEMP%\Spriggit`, remove the cache.
 Spriggit restores the translation package during the next serialization.
 
@@ -72,9 +79,10 @@ Lookup matches the object's own `FormKey`, not references.
 ## Deserialize
 
 Package and game metadata are read from the serialized tree.
+Starfield requires the same master context as serialization.
 
 ```bash
-mise exec -- Spriggit.CLI.exe deserialize --InputPath "<ModName>.spriggit" --OutputPath "<plugin.esp>"
+mise exec -- Spriggit.CLI.exe deserialize --InputPath "<ModName>.spriggit" --OutputPath "<plugin>"
 ```
 
 ## References

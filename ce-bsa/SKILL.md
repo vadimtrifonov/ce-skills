@@ -1,5 +1,5 @@
 ---
-name: skyrim-bsa
+name: ce-bsa
 description: Inspect metadata, list files, and extract BSA and BA2 archives with BSArch64.
 ---
 

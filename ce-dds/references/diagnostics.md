@@ -38,7 +38,7 @@ The component applies to the reported item and mip.
 - For UNORM formats, `0` is the minimum representable alpha value.
 
 Stored `alpha mode` does not determine whether decoded alpha is constant or varying.
-DDS does not record the Skyrim-specific purpose of the alpha channel.
+DDS does not record the shader's use of the alpha channel.
 
 ## Compare DDS files for the same game path
 

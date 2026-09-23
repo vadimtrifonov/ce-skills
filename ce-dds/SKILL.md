@@ -1,9 +1,9 @@
 ---
-name: skyrim-dds
-description: Inspect, compare, and preview Skyrim DDS textures with DirectXTex. Use for metadata, decoded channel and alpha analysis, MSE and PSNR comparison, difference images, and PNG previews.
+name: ce-dds
+description: Inspect, compare, and preview DDS textures with DirectXTex. Use for metadata, decoded channel and alpha analysis, MSE and PSNR comparison, difference images, and PNG previews.
 ---
 
-# Skyrim DDS
+# DDS Textures
 
 ## Setup
 
@@ -44,7 +44,6 @@ mise exec -- texdiag.exe analyze -nologo "<texture.dds>"
 `Variance` is an unnormalized sum of squared deviations; `Std Dev` is its square root.
 Population variance is `Variance / pixel count`.
 The fourth component of each channel tuple is decoded alpha.
-DDS does not encode its Skyrim shader meaning.
 
 ## DDS comparison
 

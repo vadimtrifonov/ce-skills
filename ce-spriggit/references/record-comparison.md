@@ -17,7 +17,7 @@ Select the definitions that answer the comparison question.
 The declared-master definition and previous active definition can differ when unrelated plugins intervene.
 
 Create an exact recursive diff.
-Apply only the field-specific rules in this reference.
+Use the game's xEdit definitions for field-specific comparison rules.
 Retain or explain every raw change in the final result.
 
 ## Representation traps
@@ -36,7 +36,7 @@ Retain or explain every raw change in the final result.
   References, landscapes, navigation meshes, and cells still override by their own FormKeys.
 - Dialogue responses are nested below dialogue topics on disk.
   Each response still has an independent FormKey.
-- `MajorRecordFlagsRaw`, `SkyrimMajorRecordFlags`, and `MajorFlags` can expose the same header bits.
+- `MajorRecordFlagsRaw`, the game-specific `*MajorRecordFlags`, and `MajorFlags` can expose the same header bits.
   `IsCompressed` exposes the compression bit again.
 - A raw Spriggit diff includes fields that xEdit marks `cpIgnore`, including some format and version fields.
 
@@ -46,6 +46,8 @@ xEdit's `S` array constructors declare sorted arrays.
 Display alignment does not make an unsorted array order-independent.
 
 For an array that is not listed, preserve order and duplicate occurrences unless its xEdit definition declares it sorted.
+
+### Skyrim fields
 
 | Field | Comparison rule |
 | --- | --- |

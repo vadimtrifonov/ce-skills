@@ -1,9 +1,9 @@
 ---
-name: skyrim-pex
-description: Inspect and decompile Skyrim Papyrus PEX files with Champollion. Use for header metadata, PSC reconstruction, or PAS disassembly.
+name: ce-pex
+description: Inspect and decompile Skyrim and Starfield Papyrus PEX files with Champollion. Use for header metadata, PSC reconstruction, or PAS disassembly.
 ---
 
-# Skyrim PEX
+# Papyrus PEX
 
 ## Setup
 
@@ -25,6 +25,7 @@ mise exec -- Champollion.exe "<script.pex>" --print-info
 `--psc` reconstructs high-level Papyrus source.
 PEX does not retain original formatting, parameter defaults, or comments; reconstructed quest-fragment PSC therefore lacks Creation Kit marker comments.
 Expressions and control flow are inferred from PEX instructions, and Champollion 1.3.2 can omit parentheses required by the original arithmetic grouping.
+For Starfield, lines marked `;***` contain guessed syntax for `Guard`, `TryGuard`, or `GetMatchingStructs`.
 
 ```bash
 mise exec -- Champollion.exe "<script.pex>" --psc "<psc-output-directory>"

@@ -18,7 +18,7 @@ from get_record import (
     get_records,
     parse_form_key_lines,
 )
-from list_records import list_records
+from list_records import is_deleted, list_records
 
 
 class RecordToolTests(unittest.TestCase):
@@ -78,6 +78,36 @@ class RecordToolTests(unittest.TestCase):
         quest = next(item for item in records if item["type"] == "Quest")
         self.assertEqual(quest["kind"], "new")
         self.assertTrue(quest["deleted"])
+
+    def test_lists_dialogue_layouts_and_starfield_groups(self) -> None:
+        cases = [
+            ("DialogTopics/Topic/RecordData.json", "DialogTopic"),
+            ("DialogTopics/Topic/Responses/Response.json", "DialogResponses"),
+            ("Quests/Quest/RecordData.json", "Quest"),
+            ("Quests/Quest/DialogTopics/Topic/RecordData.json", "DialogTopic"),
+            ("Quests/Quest/DialogTopics/Topic/Responses/Response.json", "DialogResponses"),
+            ("Quests/Quest/Scenes/Scene.json", "Scene"),
+            ("Clouds/Cloud.json", "Clouds"),
+            ("InstanceNamingRules/Rule.json", "InstanceNamingRules"),
+            ("ObjectModifications/Modification.json", "AObjectModification"),
+            ("TimeOfDays/Time.json", "TimeOfDayRecord"),
+        ]
+        for index, (path, _) in enumerate(cases, start=0x300):
+            self.write_json(path, {"FormKey": f"{index:06X}:Test.esp"})
+
+        records = {item["formKey"]: item for item in list_records(self.root)}
+        for index, (path, expected_type) in enumerate(cases, start=0x300):
+            with self.subTest(path=path):
+                form_key = f"{index:06X}:Test.esp"
+                self.assertEqual(records[form_key]["type"], expected_type)
+                self.assertEqual(get_record(self.root, form_key)["source"], path)
+
+    def test_recognizes_game_specific_deleted_flags(self) -> None:
+        for field in ("SkyrimMajorRecordFlags", "StarfieldMajorRecordFlags"):
+            for flags in ("Deleted", ["Compressed", "Deleted"]):
+                with self.subTest(field=field, flags=flags):
+                    self.assertTrue(is_deleted({field: flags}))
+            self.assertFalse(is_deleted({field: ["Compressed"]}))
 
     def test_gets_top_level_and_embedded_records(self) -> None:
         top_level = get_record(self.root, "000001:test.ESP")
