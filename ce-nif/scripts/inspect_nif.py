@@ -18,6 +18,11 @@ TEXTURES: set[str] = set()
 MATERIALS: set[str] = set()
 BEHAVIOR_GRAPHS: set[str] = set()
 SEGMENT_FILES: set[str] = set()
+MESHES: set[str] = set()
+
+# PyNifly V28.3.0 scales BSGeometry vertices, but leaves NIF node transforms unchanged.
+# Undo that scale for bounds in the same coordinates as the NIF transforms.
+BSGEOMETRY_SCALE = 69.969
 
 
 class InspectError(RuntimeError):
@@ -137,14 +142,142 @@ def block_inventory(nif: Any, nifly: Any) -> list[dict[str, Any]]:
     return result
 
 
-def bounds_report(vertices: list[Any]) -> dict[str, list[float]] | None:
+def bounds_report(vertices: list[Any], scale: float = 1.0) -> dict[str, list[float]] | None:
     if not vertices:
         return None
     columns = [[float(vertex[axis]) for vertex in vertices] for axis in range(3)]
     return {
-        "min": [min(column) for column in columns],
-        "max": [max(column) for column in columns],
+        "min": [min(column) * scale for column in columns],
+        "max": [max(column) * scale for column in columns],
     }
+
+
+def global_transform_report(shape: Any) -> dict[str, Any]:
+    # Native lookup excludes shapes; PyNifly V28.3.0's TransformBuf multiplication
+    # drops scale. Compose translation, rotation, and scale directly.
+    transform = transform_report(shape.transform)
+    translation = transform["translation"]
+    rotation = transform["rotation"]
+    scale = transform["scale"]
+    seen = {shape.id}
+    parent = shape.parent
+    while parent is not None:
+        if parent.id in seen:
+            raise InspectError("cyclic node parent chain")
+        seen.add(parent.id)
+        parent_transform = parent.transform
+        translation = [
+            parent_transform.translation[row] + parent_transform.scale * sum(
+                parent_transform.rotation[row][axis] * translation[axis] for axis in range(3)
+            )
+            for row in range(3)
+        ]
+        rotation = [
+            [
+                sum(parent_transform.rotation[row][axis] * rotation[axis][column] for axis in range(3))
+                for column in range(3)
+            ]
+            for row in range(3)
+        ]
+        scale *= parent_transform.scale
+        parent = parent.parent
+    return {"translation": translation, "rotation": rotation, "scale": scale}
+
+
+def mesh_asset_path(name: str) -> str:
+    path = name.replace("\\", "/")
+    for prefix in ("data/", "geometries/"):
+        if path.casefold().startswith(prefix):
+            path = path[len(prefix):]
+    if not path:
+        return ""
+    if not path.casefold().endswith(".mesh"):
+        path += ".mesh"
+    return "geometries/" + path
+
+
+def geometry_report(
+    shape: Any, context: str, include_geometry: bool, data_root: Path | None, lod: int
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "status": "not_loaded",
+        "vertex_count": None,
+        "triangle_count": None,
+        "has_vertex_colors": None,
+    }
+    if include_geometry:
+        result.update(dict.fromkeys((
+            "actual_vertex_count", "actual_triangle_count", "uv_count",
+            "normal_count", "color_count", "bounds",
+        )))
+    try:
+        is_bsgeometry = shape.blockname == "BSGeometry"
+        if is_bsgeometry:
+            internal = shape.is_internal_geom
+            mesh_count = shape.mesh_count
+            paths = [] if internal else [mesh_asset_path(shape.mesh_path(i)) for i in range(mesh_count)]
+            MESHES.update(path for path in paths if path)
+            result.update({
+                "storage": "internal" if internal else "external",
+                "mesh_count": mesh_count,
+                "mesh_paths": paths,
+                "lod": lod,
+            })
+        else:
+            properties = shape.properties
+            result.update({
+                "vertex_count": scalar(optional_attr(properties, "vertexCount")),
+                "triangle_count": scalar(optional_attr(properties, "triangleCount")),
+                "has_vertex_colors": bool(properties.hasVertexColors),
+            })
+        if not include_geometry:
+            return result
+        if is_bsgeometry:
+            if lod >= mesh_count:
+                raise InspectError(f"LOD {lod} is absent; shape has {mesh_count} mesh slots")
+            if internal:
+                shape.select_mesh(lod)
+            else:
+                if not paths[lod]:
+                    raise InspectError(f"LOD {lod} has no external mesh path")
+                if data_root is None:
+                    raise InspectError("external geometry requires --data-root")
+                asset = resolve_asset(paths[lod], data_root)
+                if not asset["exists_loose"]:
+                    reason = asset.get("invalid_reason", "loose mesh not found")
+                    raise InspectError(f"{reason}: {paths[lod]}")
+                if not shape.load_mesh(Path(asset["loose_path"]).read_bytes(), lod):
+                    raise InspectError(f"PyNifly could not load mesh: {paths[lod]}")
+        vertices = list(shape.verts or [])
+        triangles = list(shape.tris or [])
+        uvs = list(shape.uvs or [])
+        normals = list(shape.normals or [])
+        colors = list(shape.colors or [])
+        result.update({
+            "status": "loaded",
+            "actual_vertex_count": len(vertices),
+            "actual_triangle_count": len(triangles),
+            "uv_count": len(uvs),
+            "normal_count": len(normals),
+            "color_count": len(colors),
+            "bounds": bounds_report(vertices, 1.0 / BSGEOMETRY_SCALE if is_bsgeometry else 1.0),
+        })
+        if is_bsgeometry:
+            # BSGeometry's cached triangleCount remains zero even after loading a mesh.
+            result.update({
+                "vertex_count": len(vertices),
+                "triangle_count": len(triangles),
+                "has_vertex_colors": bool(shape.properties.hasVertexColors),
+            })
+    except Exception as error:
+        result["status"] = "unavailable"
+        ERRORS.append({"context": f"{context}.geometry", "error": str(error) or type(error).__name__})
+    return result
+
+
+def geometry_total(shapes: list[dict[str, Any]], field: str) -> int | None:
+    counts = [item["geometry"][field] for item in shapes]
+    return None if any(count is None for count in counts) else sum(counts)
 
 
 def extra_data_report(owner: Any, context: str) -> list[dict[str, Any]]:
@@ -229,6 +362,14 @@ def shader_report(shape: Any, context: str) -> dict[str, Any] | None:
     if shader is None:
         return None
     result = object_ref(shader) or {}
+    if shape.file.game == "SF":
+        material = result.get("name")
+        if material:
+            MATERIALS.add(material)
+        result["material_path"] = material or None
+        # Starfield textures and shader settings live in .mat/CDB resources, not this block.
+        result["textures"] = None
+        return result
     properties = capture(f"{context}.shader.properties", lambda: shader.properties, None)
     if properties is not None:
         for output_name, attribute in (
@@ -269,9 +410,11 @@ def alpha_report(shape: Any, context: str) -> dict[str, Any] | None:
     return result
 
 
-def shape_report(shape: Any, index: int, include_geometry: bool, include_bones: bool) -> dict[str, Any]:
+def shape_report(
+    shape: Any, index: int, include_geometry: bool, include_bones: bool,
+    data_root: Path | None, lod: int,
+) -> dict[str, Any]:
     context = f"shapes[{index}]"
-    properties = capture(f"{context}.properties", lambda: shape.properties, None)
     result = object_ref(shape) or {"index": index}
     result["index"] = index
     result["parent"] = capture(f"{context}.parent", lambda: object_ref(shape.parent), None)
@@ -279,33 +422,9 @@ def shape_report(shape: Any, index: int, include_geometry: bool, include_bones: 
         f"{context}.local_transform", lambda: transform_report(shape.transform), None
     )
     result["global_transform"] = capture(
-        f"{context}.global_transform", lambda: transform_report(shape.global_transform), None
+        f"{context}.global_transform", lambda: global_transform_report(shape), None
     )
-
-    vertex_count = scalar(optional_attr(properties, "vertexCount")) if properties is not None else None
-    triangle_count = scalar(optional_attr(properties, "triangleCount")) if properties is not None else None
-    vertex_colors = optional_attr(properties, "hasVertexColors") if properties is not None else MISSING
-    result["geometry"] = {
-        "vertex_count": vertex_count,
-        "triangle_count": triangle_count,
-        "has_vertex_colors": bool(vertex_colors) if vertex_colors is not MISSING else None,
-    }
-    if include_geometry:
-        vertices = capture(f"{context}.vertices", lambda: list(shape.verts or []), [])
-        triangles = capture(f"{context}.triangles", lambda: list(shape.tris or []), [])
-        uvs = capture(f"{context}.uvs", lambda: list(shape.uvs or []), [])
-        normals = capture(f"{context}.normals", lambda: list(shape.normals or []), [])
-        colors = capture(f"{context}.colors", lambda: list(shape.colors or []), [])
-        result["geometry"].update(
-            {
-                "actual_vertex_count": len(vertices),
-                "actual_triangle_count": len(triangles),
-                "uv_count": len(uvs),
-                "normal_count": len(normals),
-                "color_count": len(colors),
-                "bounds": bounds_report(vertices),
-            }
-        )
+    result["geometry"] = geometry_report(shape, context, include_geometry, data_root, lod)
 
     result["shader"] = shader_report(shape, context)
     result["alpha"] = alpha_report(shape, context)
@@ -318,12 +437,15 @@ def shape_report(shape: Any, index: int, include_geometry: bool, include_bones: 
     }
     if has_skin:
         bone_names = capture(f"{context}.bone_names", lambda: list(shape.bone_names), [])
-        used_bones = capture(f"{context}.used_bones", lambda: list(shape.get_used_bones()), [])
+        geometry_unloaded = shape.blockname == "BSGeometry" and result["geometry"]["status"] != "loaded"
+        used_bones = None if geometry_unloaded else capture(
+            f"{context}.used_bones", lambda: list(shape.get_used_bones()), None
+        )
         skin["bone_count"] = len(bone_names)
-        skin["used_bone_count"] = len(used_bones)
+        skin["used_bone_count"] = len(used_bones) if used_bones is not None else None
         if include_bones:
             skin["bones"] = bone_names
-            skin["used_bones"] = sorted(str(item) for item in used_bones)
+            skin["used_bones"] = sorted(str(item) for item in used_bones) if used_bones is not None else None
     result["skinning"] = skin
     result["partitions"] = partition_report(shape, context)
     result["extra_data"] = extra_data_report(shape, context)
@@ -402,6 +524,14 @@ def collision_reports(nif: Any, include_geometry: bool) -> list[dict[str, Any]]:
         flags = optional_attr(collision, "flags")
         if flags is not MISSING:
             entry["object"]["flags"] = scalar(flags)
+        if entry["object"].get("type") == "bhkNPCollisionObject":
+            # This body ID indexes the physics system's payload, not the NIF block table.
+            entry["physics_system"] = capture(
+                f"{context}.physics_system", lambda: object_ref(collision.physics_system), None
+            )
+            entry["body_index"] = capture(f"{context}.body_index", lambda: collision.body_id, None)
+            result.append(entry)
+            continue
         body = capture(f"{context}.body", lambda: collision.body, None)
         if body is not None:
             body_report = object_ref(body) or {}
@@ -498,8 +628,9 @@ def dependency_report(data_root: Path | None) -> dict[str, Any]:
         "materials": [resolve_asset(path, data_root) for path in sorted(MATERIALS, key=str.casefold)],
         "behavior_graphs": [resolve_asset(path, data_root) for path in sorted(BEHAVIOR_GRAPHS, key=str.casefold)],
         "segment_files": [resolve_asset(path, data_root) for path in sorted(SEGMENT_FILES, key=str.casefold)],
+        "meshes": [resolve_asset(path, data_root) for path in sorted(MESHES, key=str.casefold)],
         "data_root": str(data_root) if data_root else None,
-        "note": "Loose-file checks do not search BSA archives." if data_root else None,
+        "note": "Loose-file checks do not search BSA/BA2 archives or material databases." if data_root else None,
     }
 
 
@@ -509,12 +640,17 @@ def main() -> int:
     parser.add_argument("-o", "--output", type=Path)
     parser.add_argument("--force", action="store_true", help="Replace an existing JSON output file.")
     parser.add_argument("--geometry", action="store_true", help="Load geometry arrays and include counts and bounds.")
+    parser.add_argument("--lod", type=int, choices=range(4), default=0,
+                        help="Starfield mesh slot to load with --geometry (default: 0).")
     parser.add_argument("--bones", action="store_true", help="Include skin bone names.")
     parser.add_argument("--nodes", action="store_true", help="Include scene nodes and their transforms.")
     parser.add_argument("--blocks", action="store_true", help="Include the ordered NIF block list.")
-    parser.add_argument("--data-root", type=Path, help="Check referenced assets as loose files beneath this Data directory.")
+    parser.add_argument("--data-root", type=Path,
+                        help="Resolve loose dependencies and load external geometry beneath this Data directory.")
     args = parser.parse_args()
 
+    if args.lod and not args.geometry:
+        parser.error("--lod requires --geometry")
     if args.input.suffix.casefold() != ".nif":
         parser.error("input must have a .nif extension")
     input_display = args.input.resolve(strict=True)
@@ -556,10 +692,12 @@ def main() -> int:
         stream.seek(0)
         header = stream.readline(512).rstrip(b"\r\n").decode("ascii", errors="replace")
 
+    if args.lod and nif.game != "SF":
+        parser.error("--lod selects Starfield mesh slots only")
     blocks = block_inventory(nif, nifly)
     type_counts = Counter(item["type"] for item in blocks)
     shapes = [
-        shape_report(shape, index, args.geometry, args.bones)
+        shape_report(shape, index, args.geometry, args.bones, data_root, args.lod)
         for index, shape in enumerate(nif.shapes)
     ]
     collisions = collision_reports(nif, args.geometry)
@@ -586,8 +724,8 @@ def main() -> int:
         "root": root_report,
         "summary": {
             "shape_count": len(shapes),
-            "vertex_count": sum(int(item["geometry"].get("vertex_count") or 0) for item in shapes),
-            "triangle_count": sum(int(item["geometry"].get("triangle_count") or 0) for item in shapes),
+            "vertex_count": geometry_total(shapes, "vertex_count"),
+            "triangle_count": geometry_total(shapes, "triangle_count"),
             "skinned_shape_count": sum(bool(item["skinning"]["present"]) for item in shapes),
             "collision_object_count": len(collisions),
             "node_count": capture("node_count", lambda: int(nifly.getNodeCount(nif._handle)), None),

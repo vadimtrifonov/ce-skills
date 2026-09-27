@@ -1,46 +1,4 @@
----
-name: skyrim-nif
-description: Inspect, analyze, and render Skyrim NIF files with PyNifly and FO76Utils. Use for NIF block structure, meshes, textures, shaders, skinning, bones, partitions, transforms, collision, external asset references, archive-native lookup, OBJ export, and unattended PNG previews.
----
-
-# Skyrim NIF Analysis and Preview
-
-Use this skill directory as the working directory.
-
-## Setup
-
-```bash
-mise trust mise.toml
-mise install
-```
-
-## Structured report
-
-Use the read-only PyNifly inspector for semantic analysis of a loose NIF.
-
-```bash
-mise exec -- python scripts/inspect_nif.py "<input.nif>"
-mise exec -- python scripts/inspect_nif.py "<input.nif>" -o "<report.json>"
-```
-
-Report outputs must use `.json`; existing files require `--force`.
-
-Optional detail:
-
-```bash
-mise exec -- python scripts/inspect_nif.py "<input.nif>" --geometry --bones --nodes --blocks -o "<report.json>"
-```
-
-- `--geometry` adds actual geometry counts and mesh bounds.
-- `--bones` includes bone names rather than counts only.
-- `--nodes` includes the scene-node hierarchy.
-- `--blocks` includes the ordered NIF block list.
-- `--data-root "<Data>"` checks whether referenced textures and other assets exist as loose files under a supplied game or mod Data directory.
-  It does not search BSAs.
-
-Inspect both `_0.nif` and `_1.nif` members of a weight-slider pair when relevant.
-
-## Archive-native lookup
+# Skyrim Archive Queries and Previews
 
 FO76Utils can locate NIFs in loose files and BSA/BA2 archives beneath a physical Data-like directory.
 For direct PowerShell calls, set `$env:TERM = 'dumb'` so FO76Utils does not bypass redirected stdout and stderr.
@@ -108,7 +66,7 @@ mise exec -- nif_info.exe -mtl -o "<model.mtl>" "<Data>" "meshes/path/model.nif"
 
 OBJ export is a convenience view of supported geometry, not a semantic NIF round trip.
 
-## Interpretation limits
+## Preview limits
 
 - FO76Utils previews are strongest for static meshes and supported Bethesda shaders.
 - A blank skinned-mesh preview is inconclusive, not evidence that the NIF contains no geometry.

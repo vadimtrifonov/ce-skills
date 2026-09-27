@@ -303,7 +303,7 @@ def path_within(path: Path, directory: Path) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Render one exact NIF asset to PNG with FO76Utils nif_info."
+        description="Render one exact Skyrim NIF asset to PNG with FO76Utils; Starfield geometry is unsupported."
     )
     parser.add_argument(
         "source",
@@ -452,7 +452,7 @@ def main() -> int:
         if statistics["blank"]:
             warnings.append("The render is completely blank; FO76Utils may not support this mesh.")
         elif statistics["likely_blank"]:
-            warnings.append("The render contains very few visible pixels; inspect it manually.")
+            warnings.append("The render contains very few visible pixels; inspect the PNG.")
         if source.is_file():
             warnings.append(
                 "A single archive source may not contain referenced textures from other archives; "
