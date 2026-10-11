@@ -1,6 +1,6 @@
 ---
 name: ce-mutagen
-description: Create temporary C# projects against the current Mutagen source. Use for Skyrim and Starfield record inspection, synthetic plugin fixtures, and plugin generation.
+description: Create temporary Mutagen-based projects for Skyrim and Starfield record inspection, synthetic plugin fixtures, and plugin generation.
 ---
 
 # Mutagen

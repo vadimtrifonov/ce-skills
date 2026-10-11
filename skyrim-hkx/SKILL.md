@@ -1,6 +1,6 @@
 ---
 name: skyrim-hkx
-description: Convert and inspect Skyrim Havok 2010.2 HKX animation, skeleton, and behavior files with serde-hkx and PyNifly. Use for XML conversion, animation metadata, annotations, bindings, skeleton mappings, and decompressed transform tracks.
+description: Convert and inspect Skyrim HKX animation, skeleton, and behavior files.
 ---
 
 # Skyrim HKX Analysis

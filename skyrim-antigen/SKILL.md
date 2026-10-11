@@ -1,6 +1,6 @@
 ---
 name: skyrim-antigen
-description: Build and run targeted Antigen diagnostics for Skyrim plugins in MO2 profiles. Use to detect or explain record, reference, asset, worldspace, NPC, quest, dialogue, scene, package, and leveled-list issues.
+description: Run targeted Antigen diagnostics for Skyrim plugins in MO2 profiles. Use to detect or explain record, reference, asset, worldspace, NPC, quest, dialogue, scene, package, and leveled-list issues.
 ---
 
 # Skyrim Antigen
