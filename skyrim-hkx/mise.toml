@@ -1,5 +1,5 @@
 [tools]
-python = "3.14"
+python = "3.15"
 "github:SARDONYX-sard/serde-hkx" = "2.0.0"
 "github:BadDogSkyrim/PyNifly" = "V28.3.0"
 
