@@ -11,7 +11,6 @@ Use this skill directory as the working directory.
 
 ```bash
 mise trust mise.toml
-mise install python github:SARDONYX-sard/serde-hkx github:BadDogSkyrim/PyNifly
 ```
 
 ## HKX to XML
