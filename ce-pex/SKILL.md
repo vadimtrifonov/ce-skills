@@ -9,7 +9,6 @@ description: Inspect and decompile Skyrim and Starfield Papyrus PEX files with C
 
 ```bash
 mise trust mise.toml
-mise install
 ```
 
 ## Inspect

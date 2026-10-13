@@ -114,7 +114,6 @@ To scan source, run from this skill directory:
 
 ```powershell
 mise trust mise.toml
-mise install
 mise exec -- python -m pip install --upgrade --editable "$tools"
 mise exec -- python -m vr_address_tools 'C:\Path\To\Plugin\src' analyze
 ```

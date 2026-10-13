@@ -9,7 +9,6 @@ description: Inspect, compare, and preview DDS textures with DirectXTex. Use for
 
 ```bash
 mise trust mise.toml
-mise install
 ```
 
 At the legacy Windows path limit, ordinary paths can fail as not found.

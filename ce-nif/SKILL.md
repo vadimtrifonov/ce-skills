@@ -16,7 +16,6 @@ The renderer and OBJ exporter do not support Starfield.
 
 ```bash
 mise trust mise.toml
-mise install
 ```
 
 ## Structured report
